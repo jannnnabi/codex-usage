@@ -1,0 +1,226 @@
+<Window x:Class="codexpet.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:codexpet"
+        Title="codex-usage"
+        Width="192"
+        Height="92"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        Focusable="False">
+    <Window.Resources>
+        <FontFamily x:Key="HudFont">Segoe UI Variable Text, Segoe UI, Malgun Gothic</FontFamily>
+    </Window.Resources>
+
+    <Grid x:Name="Root" Background="Transparent" MouseLeftButtonDown="Root_OnMouseLeftButtonDown">
+        <Border x:Name="ExpandedCard"
+                Margin="4"
+                Padding="7,6,8,6"
+                CornerRadius="18"
+                Background="#F6FFFFFF"
+                ClipToBounds="True"
+                SnapsToDevicePixels="True">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="34"/>
+                    <RowDefinition Height="34"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" ClipToBounds="True">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="35"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="20"/>
+                        <RowDefinition Height="14"/>
+                    </Grid.RowDefinitions>
+
+                    <Border x:Name="PrimaryIconBack"
+                            Grid.RowSpan="2"
+                            Width="26"
+                            Height="26"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            CornerRadius="13"
+                            Background="#DDF7E0">
+                        <Viewbox Margin="6">
+                            <Grid Width="48" Height="48">
+                                <Ellipse Width="28" Height="28" Stroke="{Binding ElementName=PrimaryPercentText, Path=Foreground}" StrokeThickness="4"/>
+                                <Line X1="24" Y1="24" X2="24" Y2="13" Stroke="{Binding ElementName=PrimaryPercentText, Path=Foreground}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line X1="24" Y1="24" X2="33" Y2="30" Stroke="{Binding ElementName=PrimaryPercentText, Path=Foreground}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Grid>
+                        </Viewbox>
+                    </Border>
+
+                    <Grid Grid.Column="1" VerticalAlignment="Center" ClipToBounds="True">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="PrimaryDurationText"
+                                   FontFamily="{StaticResource HudFont}"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="#0D0D0D"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="PrimaryDotText"
+                                   Grid.Column="1"
+                                   Margin="6,0,6,0"
+                                   FontFamily="{StaticResource HudFont}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="#8A8D96"
+                                   Text="·"/>
+                        <TextBlock x:Name="PrimaryResetText"
+                                   Grid.Column="2"
+                                   MinWidth="0"
+                                   FontFamily="{StaticResource HudFont}"
+                                   FontSize="10.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="#858893"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </Grid>
+
+                    <TextBlock x:Name="PrimaryPercentText"
+                               Grid.Column="2"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               FontFamily="{StaticResource HudFont}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="#18B72A"/>
+
+                    <Grid x:Name="PrimaryTrack"
+                          Grid.Row="1"
+                          Grid.Column="1"
+                          Grid.ColumnSpan="2"
+                          Height="5"
+                          Margin="0,3,0,0"
+                          VerticalAlignment="Top"
+                          ClipToBounds="True">
+                        <Border x:Name="PrimaryTrackBack" CornerRadius="4" Background="#E9E9EA"/>
+                        <Border x:Name="PrimaryTrackFill" Width="0" HorizontalAlignment="Left" CornerRadius="4" Background="#18B72A"/>
+                    </Grid>
+                </Grid>
+
+                <Grid Grid.Row="1" ClipToBounds="True">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="35"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="20"/>
+                        <RowDefinition Height="14"/>
+                    </Grid.RowDefinitions>
+
+                    <Border x:Name="SecondaryIconBack"
+                            Grid.RowSpan="2"
+                            Width="26"
+                            Height="26"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            CornerRadius="13"
+                            Background="#FFF2D8">
+                        <Viewbox Margin="6">
+                            <Grid Width="48" Height="48">
+                                <Rectangle Width="27" Height="23" RadiusX="3" RadiusY="3" Stroke="{Binding ElementName=SecondaryPercentText, Path=Foreground}" StrokeThickness="4"/>
+                                <Line X1="11" Y1="20" X2="37" Y2="20" Stroke="{Binding ElementName=SecondaryPercentText, Path=Foreground}" StrokeThickness="4"/>
+                                <Line X1="17" Y1="12" X2="17" Y2="19" Stroke="{Binding ElementName=SecondaryPercentText, Path=Foreground}" StrokeThickness="4" StrokeStartLineCap="Round"/>
+                                <Line X1="31" Y1="12" X2="31" Y2="19" Stroke="{Binding ElementName=SecondaryPercentText, Path=Foreground}" StrokeThickness="4" StrokeStartLineCap="Round"/>
+                            </Grid>
+                        </Viewbox>
+                    </Border>
+
+                    <Grid Grid.Column="1" VerticalAlignment="Center" ClipToBounds="True">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="SecondaryDurationText"
+                                   FontFamily="{StaticResource HudFont}"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="#0D0D0D"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="SecondaryDotText"
+                                   Grid.Column="1"
+                                   Margin="6,0,6,0"
+                                   FontFamily="{StaticResource HudFont}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="#8A8D96"
+                                   Text="·"/>
+                        <TextBlock x:Name="SecondaryResetText"
+                                   Grid.Column="2"
+                                   MinWidth="0"
+                                   FontFamily="{StaticResource HudFont}"
+                                   FontSize="10.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="#858893"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </Grid>
+
+                    <TextBlock x:Name="SecondaryPercentText"
+                               Grid.Column="2"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               FontFamily="{StaticResource HudFont}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="#F6B200"/>
+
+                    <Grid x:Name="SecondaryTrack"
+                          Grid.Row="1"
+                          Grid.Column="1"
+                          Grid.ColumnSpan="2"
+                          Height="5"
+                          Margin="0,3,0,0"
+                          VerticalAlignment="Top"
+                          ClipToBounds="True">
+                        <Border x:Name="SecondaryTrackBack" CornerRadius="4" Background="#E9E9EA"/>
+                        <Border x:Name="SecondaryTrackFill" Width="0" HorizontalAlignment="Left" CornerRadius="4" Background="#F6B200"/>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Border x:Name="CollapsedPill"
+                Width="64"
+                Height="64"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                CornerRadius="32"
+                Background="#F6FFFFFF"
+                Visibility="Collapsed">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20"
+                                  Direction="270"
+                                  Opacity="0.20"
+                                  ShadowDepth="6"
+                                  Color="#60000000"/>
+            </Border.Effect>
+            <Grid>
+                <local:RingGauge x:Name="CollapsedGauge"
+                                 Margin="7"
+                                 Percent="0"/>
+                <TextBlock x:Name="CollapsedPercentText"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontFamily="{StaticResource HudFont}"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="#18B72A"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
