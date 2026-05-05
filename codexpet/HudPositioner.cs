@@ -5,56 +5,68 @@ namespace codexpet;
 
 public sealed class HudPositioner
 {
-    private const double ExpandedPetGap = 10;
+    private const double ExpandedPetGap = 1;
     private const double CollapsedPetGap = 14;
     private const double BottomRowGap = 14;
     private const double PetVisualReserve = 92;
     private const double NotificationVisibleLeftInset = 58;
-    private const double MinimumBottomInset = 8;
+    private const double MinimumBottomInset = 1;
     private const double NotificationClearRatio = 0.62;
     private const double ScreenMargin = 18;
     private const double TrayFallbackBottomReserve = 88;
 
-    public Point Compute(double hudWidth, double hudHeight, bool collapsed, double dpiScaleX, double dpiScaleY)
+    public HudPlacement Compute(IntPtr hudHandle, double hudWidthDip, double hudHeightDip, bool collapsed)
     {
-        var windows = EnumerateCodexWindows(dpiScaleX, dpiScaleY);
+        var currentScale = NativeMethods.DpiScaleForWindow(hudHandle);
+        var hudRect = GetHudDeviceRect(hudHandle, hudWidthDip, hudHeightDip, currentScale);
+        var hudWidth = hudRect.Width;
+        var hudHeight = hudRect.Height;
+
+        var windows = EnumerateCodexWindows();
         var petArea = FindPetArea(windows);
         Rect workArea;
         Rect candidate;
 
         if (petArea is not null)
         {
-            workArea = NativeMethods.WorkAreaFromRect(petArea.DeviceRect, dpiScaleX, dpiScaleY);
-            candidate = PlaceInsidePetGroup(petArea.Bounds, hudWidth, hudHeight, collapsed, workArea);
-        }
-        else
-        {
-            workArea = SystemParameters.WorkArea;
-            candidate = PlaceFallback(hudWidth, hudHeight, workArea);
+            workArea = NativeMethods.WorkAreaFromDeviceRect(petArea.DeviceRect);
+            candidate = PlaceInsidePetGroup(petArea.Bounds, hudWidth, hudHeight, collapsed, workArea, petArea.DpiScale);
+            candidate = ClampToWorkArea(candidate, workArea, petArea.DpiScale);
+            return new HudPlacement(new Point(candidate.Left, candidate.Top), true);
         }
 
-        candidate = ClampToWorkArea(candidate, workArea);
-        return new Point(candidate.Left, candidate.Top);
+        workArea = NativeMethods.WorkAreaFromDeviceRect(ToRect32(hudRect));
+        candidate = PlaceFallback(hudWidth, hudHeight, workArea, currentScale);
+        candidate = ClampToWorkArea(candidate, workArea, currentScale);
+        return new HudPlacement(new Point(candidate.Left, candidate.Top), false);
     }
 
-    private static Rect PlaceInsidePetGroup(Rect petGroup, double hudWidth, double hudHeight, bool collapsed, Rect workArea)
+    private static Rect GetHudDeviceRect(IntPtr hudHandle, double hudWidthDip, double hudHeightDip, double dpiScale)
     {
-        var bottomInset = collapsed ? CollapsedPetGap : ExpandedPetGap;
+        if (hudHandle != IntPtr.Zero
+            && NativeMethods.GetWindowRect(hudHandle, out var rect)
+            && rect.Width > 0
+            && rect.Height > 0)
+        {
+            return NativeMethods.ToRect(rect);
+        }
+
+        return new Rect(0, 0, Math.Max(1, hudWidthDip * dpiScale), Math.Max(1, hudHeightDip * dpiScale));
+    }
+
+    private static Rect PlaceInsidePetGroup(Rect petGroup, double hudWidth, double hudHeight, bool collapsed, Rect workArea, double dpiScale)
+    {
+        var bottomInset = Scale(collapsed ? CollapsedPetGap : ExpandedPetGap, dpiScale);
         var preferredTop = petGroup.Bottom - hudHeight - bottomInset;
         var clearNotificationTop = petGroup.Top + petGroup.Height * NotificationClearRatio;
-        var lowestTop = petGroup.Bottom - hudHeight - MinimumBottomInset;
+        var lowestTop = petGroup.Bottom - hudHeight - Scale(MinimumBottomInset, dpiScale);
         var top = Math.Min(Math.Max(preferredTop, clearNotificationTop), lowestTop);
 
-        var visibleNotificationLeft = petGroup.Left + NotificationVisibleLeftInset;
-        var desiredRight = petGroup.Right - PetVisualReserve - BottomRowGap;
+        var visibleNotificationLeft = petGroup.Left + Scale(NotificationVisibleLeftInset, dpiScale);
+        var desiredRight = petGroup.Right - Scale(PetVisualReserve + BottomRowGap, dpiScale);
         var left = collapsed
-            ? petGroup.Right - PetVisualReserve - CollapsedPetGap - hudWidth
+            ? petGroup.Right - Scale(PetVisualReserve + CollapsedPetGap, dpiScale) - hudWidth
             : desiredRight - hudWidth;
-
-        if (!collapsed && left < petGroup.Left)
-        {
-            left = petGroup.Left;
-        }
 
         if (!collapsed && left < visibleNotificationLeft)
         {
@@ -62,27 +74,27 @@ public sealed class HudPositioner
         }
 
         var insideGroup = new Rect(left, top, hudWidth, hudHeight);
-        if (FitsWithinWorkArea(insideGroup, workArea))
+        if (FitsWithinWorkArea(insideGroup, workArea, dpiScale))
         {
             return insideGroup;
         }
 
         var leftCandidate = new Rect(
-            petGroup.Left - hudWidth - ExpandedPetGap,
+            petGroup.Left - hudWidth - Scale(ExpandedPetGap, dpiScale),
             top,
             hudWidth,
             hudHeight);
-        if (FitsWithinWorkArea(leftCandidate, workArea))
+        if (FitsWithinWorkArea(leftCandidate, workArea, dpiScale))
         {
             return leftCandidate;
         }
 
         var rightCandidate = new Rect(
-            petGroup.Right + ExpandedPetGap,
+            petGroup.Right + Scale(ExpandedPetGap, dpiScale),
             top,
             hudWidth,
             hudHeight);
-        if (FitsWithinWorkArea(rightCandidate, workArea))
+        if (FitsWithinWorkArea(rightCandidate, workArea, dpiScale))
         {
             return rightCandidate;
         }
@@ -90,27 +102,29 @@ public sealed class HudPositioner
         return insideGroup;
     }
 
-    private static bool FitsWithinWorkArea(Rect rect, Rect workArea)
+    private static bool FitsWithinWorkArea(Rect rect, Rect workArea, double dpiScale)
     {
-        return rect.Left >= workArea.Left + ScreenMargin
-            && rect.Top >= workArea.Top + ScreenMargin
-            && rect.Right <= workArea.Right - ScreenMargin
-            && rect.Bottom <= workArea.Bottom - ScreenMargin;
+        var margin = Scale(ScreenMargin, dpiScale);
+        return rect.Left >= workArea.Left + margin
+            && rect.Top >= workArea.Top + margin
+            && rect.Right <= workArea.Right - margin
+            && rect.Bottom <= workArea.Bottom - margin;
     }
 
-    private static Rect PlaceFallback(double hudWidth, double hudHeight, Rect workArea)
+    private static Rect PlaceFallback(double hudWidth, double hudHeight, Rect workArea, double dpiScale)
     {
         return new Rect(
-            workArea.Right - hudWidth - ScreenMargin,
-            workArea.Bottom - hudHeight - TrayFallbackBottomReserve,
+            workArea.Right - hudWidth - Scale(ScreenMargin, dpiScale),
+            workArea.Bottom - hudHeight - Scale(TrayFallbackBottomReserve, dpiScale),
             hudWidth,
             hudHeight);
     }
 
-    private static Rect ClampToWorkArea(Rect rect, Rect workArea)
+    private static Rect ClampToWorkArea(Rect rect, Rect workArea, double dpiScale)
     {
-        var left = Math.Min(Math.Max(rect.Left, workArea.Left + ScreenMargin), workArea.Right - rect.Width - ScreenMargin);
-        var top = Math.Min(Math.Max(rect.Top, workArea.Top + ScreenMargin), workArea.Bottom - rect.Height - ScreenMargin);
+        var margin = Scale(ScreenMargin, dpiScale);
+        var left = Math.Min(Math.Max(rect.Left, workArea.Left + margin), workArea.Right - rect.Width - margin);
+        var top = Math.Min(Math.Max(rect.Top, workArea.Top + margin), workArea.Bottom - rect.Height - margin);
         return new Rect(left, top, rect.Width, rect.Height);
     }
 
@@ -127,10 +141,10 @@ public sealed class HudPositioner
         }
 
         var anchor = petLikeWindows[0];
-        return new PetArea(anchor.Bounds, anchor.DeviceRect);
+        return new PetArea(NativeMethods.ToRect(anchor.DeviceRect), anchor.DeviceRect, anchor.DpiScale);
     }
 
-    private static IReadOnlyList<CodexWindow> EnumerateCodexWindows(double dpiScaleX, double dpiScaleY)
+    private static IReadOnlyList<CodexWindow> EnumerateCodexWindows()
     {
         var windows = new List<CodexWindow>();
         var currentProcessId = Environment.ProcessId;
@@ -168,24 +182,26 @@ public sealed class HudPositioner
                 return true;
             }
 
-            var bounds = NativeMethods.ToDipRect(rect, dpiScaleX, dpiScaleY);
             var title = NativeMethods.GetWindowTitle(hwnd);
             var className = NativeMethods.GetWindowClass(hwnd);
+            var dpiScale = NativeMethods.DpiScaleForWindow(hwnd);
+            var widthDip = rect.Width / dpiScale;
+            var heightDip = rect.Height / dpiScale;
             var isMainWindow = string.Equals(title, "Codex", StringComparison.OrdinalIgnoreCase)
-                && bounds.Width > 700
-                && bounds.Height > 500;
+                && widthDip > 700
+                && heightDip > 500;
             if (isMainWindow)
             {
                 return true;
             }
 
-            if (bounds.Width > 1100 || bounds.Height > 650)
+            if (widthDip > 1100 || heightDip > 650)
             {
                 return true;
             }
 
             var exStyle = NativeMethods.GetWindowLong(hwnd, NativeMethods.GwlExStyle);
-            windows.Add(new CodexWindow(hwnd, bounds, rect, title, className, exStyle));
+            windows.Add(new CodexWindow(hwnd, rect, title, className, exStyle, dpiScale));
             return true;
         }, IntPtr.Zero);
 
@@ -230,29 +246,48 @@ public sealed class HudPositioner
             return false;
         }
 
-        var rect = window.Bounds;
-        if (rect.Width < 300 || rect.Height < 250)
+        var widthDip = window.DeviceRect.Width / window.DpiScale;
+        var heightDip = window.DeviceRect.Height / window.DpiScale;
+        if (widthDip < 220 || heightDip < 190)
         {
             return false;
         }
 
-        if (rect.Width > 430 || rect.Height > 380)
+        if (widthDip > 430 || heightDip > 380)
         {
             return false;
         }
 
-        var ratio = rect.Width / Math.Max(1, rect.Height);
+        var ratio = widthDip / Math.Max(1, heightDip);
         return ratio is > 0.95 and < 1.25;
     }
 
     private static double ScorePetCandidate(CodexWindow window)
     {
-        var rect = window.Bounds;
+        var rect = window.DeviceRect;
         var titleScore = window.Title.Equals("Codex", StringComparison.OrdinalIgnoreCase) ? 25_000 : 0;
         var classScore = window.ClassName.Equals("Chrome_WidgetWin_1", StringComparison.OrdinalIgnoreCase) ? 10_000 : 0;
         return rect.Width * rect.Height + titleScore + classScore;
     }
 
-    private sealed record CodexWindow(IntPtr Handle, Rect Bounds, Rect32 DeviceRect, string Title, string ClassName, int ExStyle);
-    private sealed record PetArea(Rect Bounds, Rect32 DeviceRect);
+    private static double Scale(double value, double dpiScale)
+    {
+        return value * dpiScale;
+    }
+
+    private static Rect32 ToRect32(Rect rect)
+    {
+        return new Rect32
+        {
+            Left = (int)Math.Round(rect.Left),
+            Top = (int)Math.Round(rect.Top),
+            Right = (int)Math.Round(rect.Right),
+            Bottom = (int)Math.Round(rect.Bottom)
+        };
+    }
+
+    private sealed record CodexWindow(IntPtr Handle, Rect32 DeviceRect, string Title, string ClassName, int ExStyle, double DpiScale);
+    private sealed record PetArea(Rect Bounds, Rect32 DeviceRect, double DpiScale);
 }
+
+public sealed record HudPlacement(Point DevicePosition, bool IsPetAnchored);

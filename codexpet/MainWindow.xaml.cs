@@ -27,13 +27,19 @@ public partial class MainWindow : Window
     private RateLimitSnapshot? _snapshot;
     private bool _isCollapsed;
     private bool _isDark;
+    private bool _isDraggingFallback;
+    private bool _isPetAnchored;
     private bool _refreshRunning;
+    private IntPtr _windowHandle;
+    private Point? _manualFallbackPositionDevice;
 
     public MainWindow()
     {
         InitializeComponent();
 
         _isKorean = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("ko", StringComparison.OrdinalIgnoreCase);
+        Root.ContextMenu = CreateContextMenu();
+        Root.MouseRightButtonUp += Root_OnMouseRightButtonUp;
         _positionTimer = new DispatcherTimer { Interval = PositionRefreshInterval };
         _positionTimer.Tick += (_, _) => UpdatePosition();
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
@@ -48,7 +54,8 @@ public partial class MainWindow : Window
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        NativeMethods.MakeToolWindowNoActivate(new WindowInteropHelper(this).Handle);
+        _windowHandle = new WindowInteropHelper(this).Handle;
+        NativeMethods.MakeToolWindowNoActivate(_windowHandle);
         ApplyTheme();
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
 
@@ -77,6 +84,57 @@ public partial class MainWindow : Window
         {
             SetCollapsed(!_isCollapsed);
             e.Handled = true;
+            return;
+        }
+
+        if (!_isPetAnchored && e.LeftButton == MouseButtonState.Pressed)
+        {
+            DragFallbackWindow();
+            e.Handled = true;
+        }
+    }
+
+    private ContextMenu CreateContextMenu()
+    {
+        var menu = new ContextMenu();
+        var exitItem = new MenuItem { Header = _isKorean ? "종료" : "Exit" };
+        exitItem.Click += (_, _) => Close();
+        menu.Items.Add(exitItem);
+        return menu;
+    }
+
+    private void Root_OnMouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (Root.ContextMenu is not { } menu)
+        {
+            return;
+        }
+
+        menu.PlacementTarget = Root;
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private void DragFallbackWindow()
+    {
+        _isDraggingFallback = true;
+        try
+        {
+            DragMove();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        finally
+        {
+            _isDraggingFallback = false;
+            if (_windowHandle != IntPtr.Zero
+                && NativeMethods.GetWindowRect(_windowHandle, out var rect)
+                && rect.Width > 0
+                && rect.Height > 0)
+            {
+                _manualFallbackPositionDevice = new Point(rect.Left, rect.Top);
+            }
         }
     }
 
@@ -191,10 +249,30 @@ public partial class MainWindow : Window
 
     private void UpdatePosition()
     {
-        var dpi = VisualTreeHelper.GetDpi(this);
-        var target = _positioner.Compute(ActualWidth > 0 ? ActualWidth : Width, ActualHeight > 0 ? ActualHeight : Height, _isCollapsed, dpi.DpiScaleX, dpi.DpiScaleY);
-        Left = target.X;
-        Top = target.Y;
+        if (_isDraggingFallback || _windowHandle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var placement = _positioner.Compute(_windowHandle, ActualWidth > 0 ? ActualWidth : Width, ActualHeight > 0 ? ActualHeight : Height, _isCollapsed);
+        _isPetAnchored = placement.IsPetAnchored;
+        if (placement.IsPetAnchored)
+        {
+            _manualFallbackPositionDevice = null;
+        }
+        else if (_manualFallbackPositionDevice is not null)
+        {
+            return;
+        }
+
+        NativeMethods.SetWindowPos(
+            _windowHandle,
+            IntPtr.Zero,
+            (int)Math.Round(placement.DevicePosition.X),
+            (int)Math.Round(placement.DevicePosition.Y),
+            0,
+            0,
+            NativeMethods.SwpNoSize | NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate);
     }
 
     private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
